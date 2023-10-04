@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 import torch
 from deva.model.network import DEVA
+from deva.checkpoint import ensure_checkpoint
 
 
 def add_common_eval_args(parser: ArgumentParser):
@@ -60,11 +61,12 @@ def get_model_and_config(parser: ArgumentParser):
     args = parser.parse_args()
     config = vars(args)
     config['enable_long_term'] = not config['disable_long_term']
+    config.setdefault('enable_long_term_count_usage', True)
 
     # Load our checkpoint
     network = DEVA(config).cuda().eval()
     if args.model is not None:
-        model_weights = torch.load(args.model)
+        model_weights = torch.load(ensure_checkpoint(args.model))
         network.load_weights(model_weights)
     else:
         print('No model loaded.')

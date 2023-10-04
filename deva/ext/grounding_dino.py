@@ -19,6 +19,7 @@ import numpy as np
 import torch
 
 from deva.inference.object_info import ObjectInfo
+from deva.ext.inference import Tracker
 
 
 def get_grounding_dino_model(config: Dict, device: str) -> (GroundingDINOModel, SamPredictor):
@@ -117,3 +118,68 @@ def segment_with_text(config: Dict, gd_model: GroundingDINOModel, sam: SamPredic
             curr_id += 1
 
     return output_mask, segments_info
+
+
+
+
+class DINOTracker(Tracker):
+    def __init__(self, deva, 
+                       gd_model: GroundingDINOModel,
+                       sam_model: SamPredictor):
+        super().__init__(deva, gd_model.device)
+        self.gd_model = gd_model
+        self.sam = sam_model
+        # if isinstance(sam_model, FastSAM):
+        #     self.predict_masks = self.predict_masks_fastsam
+    
+    def predict_classes(self, image):
+        BOX_THRESHOLD = TEXT_THRESHOLD = self.cfg['DINO_THRESHOLD']
+        NMS_THRESHOLD = self.cfg['DINO_NMS_THRESHOLD']
+        CLASSES = self.cfg['prompt'].split(".")
+
+        # get detections
+        detections = self.gd_model.predict_with_classes(
+            image=image[:, :, ::-1],  # use bgr
+            classes=CLASSES,
+            box_threshold=BOX_THRESHOLD,
+            text_threshold=TEXT_THRESHOLD)
+
+        nms_idx = torchvision.ops.nms(
+            torch.from_numpy(detections.xyxy),
+            torch.from_numpy(detections.confidence),
+            NMS_THRESHOLD).numpy().tolist()
+
+        detections.xyxy = detections.xyxy[nms_idx]
+        detections.confidence = detections.confidence[nms_idx]
+        detections.class_id = detections.class_id[nms_idx]
+        detections = self.predict_masks(image, detections)
+        return detections
+
+    def predict_masks(self, image, detections):
+        if not len(detections.xyxy):
+            return detections
+        result_masks = []
+        self.sam.set_image(image, image_format='RGB')
+        for box in detections.xyxy:
+            masks, scores, _ = self.sam.predict(box=box, multimask_output=True)
+            result_masks.append(masks[np.argmax(scores)])
+        detections.mask = np.array(result_masks)
+        return detections
+
+    # def predict_masks_fastsam(self, image, detections):
+    #     if not len(detections.xyxy):
+    #         return detections
+    #     everything_results = self.sam(
+    #         image, device=self.device,
+    #         verbose=False)
+    #     prompt_process = FastSAMPrompt(
+    #         image, everything_results,
+    #         device=self.device)
+
+    #     masks = []
+    #     for box in detections.xyxy:
+    #         ann = prompt_process.box_prompt(bbox=box)
+    #         m=ann[0].masks.data.cpu().numpy()
+    #         masks.append(m)
+    #     detections.mask = np.concatenate([m for m in masks])
+    #     return detections
