@@ -8,11 +8,15 @@ University of Illinois Urbana-Champaign and Adobe
 
 ICCV 2023
 
-[[arXiV (coming soon)]]() [[PDF]](https://drive.google.com/file/d/1lAgg-j8d6EH1XYUz9htDaZDh4pxuIslb) [[Project Page]](https://hkchengrex.github.io/Tracking-Anything-with-DEVA/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1OsyNVoV_7ETD1zIE8UWxL3NXxu12m_YZ?usp=sharing)
+[[arXiV]](https://arxiv.org/abs/2309.03903) [[PDF]](https://arxiv.org/pdf/2309.03903.pdf) [[Project Page]](https://hkchengrex.github.io/Tracking-Anything-with-DEVA/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1OsyNVoV_7ETD1zIE8UWxL3NXxu12m_YZ?usp=sharing)
 
 ## Highlights
 1. Provide long-term, open-vocabulary video segmentation with text-prompts out-of-the-box.
 2. Fairly easy to **integrate your own image model**! Wouldn't you or your reviewers be interested in seeing examples where your image model also works well on videos :smirk:? No finetuning is needed!
+
+***Note (Sep 12 2023):*** We have improved automatic video segmentation by not querying the points in segmented regions. We correspondingly increased the number of query points per side to 64 and deprecated the "engulf" mode. The old code can be found in the "legacy_engulf" branch. The new code should run a lot faster and capture smaller objects. The text-prompted mode is still recommended for better results.
+
+***Note (Sep 11 2023):*** We have removed the "pluralize" option as it works weirdly sometimes with GroundingDINO. If needed, please pluralize the prompt yourself.
 
 ## Abstract
 
@@ -23,7 +27,13 @@ We show that this decoupled formulation compares favorably to end-to-end approac
 
 ## Demo Videos
 
-### Demo with Grounded Segment Anything (text prompt: "pig"):
+### Demo with Grounded Segment Anything (text prompt: "guinea pigs" and "chicken"):
+
+https://github.com/hkchengrex/Tracking-Anything-with-DEVA/assets/7107196/457a9a6a-86c3-4c5a-a3cc-25199427cd11
+
+Source: https://www.youtube.com/watch?v=FM9SemMfknA
+
+### Demo with Grounded Segment Anything (text prompt: "pigs"):
 
 https://github.com/hkchengrex/Tracking-Anything-with-DEVA/assets/7107196/9a6dbcd1-2c84-45c8-ac0a-4ad31169881f
 
@@ -49,7 +59,7 @@ Source: https://youtu.be/FQQaSyH9hZI
 
 ## Installation
 
-(Tested on Ubuntu only)
+Tested on Ubuntu only. For installation on Windows WSL2, refer to https://github.com/hkchengrex/Tracking-Anything-with-DEVA/issues/20 (thanks @21pl).
 
 **Prerequisite:**
 - Python 3.7+
@@ -65,22 +75,31 @@ git clone https://github.com/hkchengrex/Tracking-Anything-with-DEVA.git
 cd Tracking-Anything-with-DEVA
 pip install -e .
 ```
+(If you encounter the `File "setup.py" not found` error, upgrade your pip with `pip install --upgrade pip`)
 
 **Download the pretrained models:**
 ```bash
 bash scripts/download_models.sh
 ```
 
+**Required for the text-prompted/automatic demo:**
+
+Install [our fork of Grounded-Segment-Anything](https://github.com/hkchengrex/Grounded-Segment-Anything). Follow its instructions.
+
+Grounding DINO installation might fail silently.
+Try `python -c "from groundingdino.util.inference import Model as GroundingDINOModel"`.
+If you get a warning about running on CPU mode only, make sure you have `CUDA_HOME` set during Grounding DINO installation.
+
 **(Optional) For fast integer program solving in the semi-online setting:** 
 
 Get your [gurobi](https://www.gurobi.com/) licence which is free for academic use. 
 If a license is not found, we fall back to using [PuLP](https://github.com/coin-or/pulp) which is slower and is not rigorously tested by us. All experiments are conducted with gurobi.
 
-**(Optional) For text-prompted/automatic demo:**
-
-Install [our fork of Grounded-Segment-Anything](https://github.com/hkchengrex/Grounded-Segment-Anything). Follow its instructions.
 
 ## Quick Start
+
+[DEMO.md](docs/DEMO.md) contains more details on the input arguments and tips on speeding up inference.
+You can always look at `deva/inference/eval_args.py` and `deva/ext/ext_eval_args.py` for a full list of arguments.
 
 **With gradio:**
 ```bash
@@ -90,8 +109,6 @@ Then visit the link that popped up on the terminal. If executing on a remote ser
 
 We have prepared an example in `example/vipseg/12_1mWNahzcsAc` (a clip from the VIPSeg dataset).
 The following two scripts segment the example clip using either Grounded Segment Anything with text prompts or SAM with automatic (points in grid) prompting.
-
-(The method runs faster with scripts than with gradio.)
 
 **Script (text-prompted):**
 ```bash
@@ -110,9 +127,6 @@ python demo/demo_automatic.py --chunk_size 4 \
 --size 480 \
 --output ./example/output
 ```
-
-[DEMO.md](docs/DEMO.md) contains more details on the arguments.
-You can always look at `deva/inference/eval_args.py` and `deva/ext/ext_eval_args.py` for a full list of arguments.
 
 ## Training and Evaluation
 
